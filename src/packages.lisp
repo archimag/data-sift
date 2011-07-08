@@ -1,14 +1,22 @@
 ;;;; packages.lisp
 ;;;;
-;;;; This file is part of the Procrustes library, released under Lisp-LGPL.
+;;;; This file is part of the DATA-SIFT library, released under Lisp-LGPL.
 ;;;; See file COPYING for details.
 ;;;;
 ;;;; Author: Moskvitin Andrey <archimag@gmail.com>
 
-(defpackage #:procrustes
+(defpackage #:data-sift
   (:use #:cl #:alexandria)
-  (:export #:validate
-           #:make-validator
+  (:export #:sift
+           #:compile-rule
+           
            ;; conditions
+           #:invalid-rule
            #:validation-fail
-           #:stop-validation))
+           #:stop-validation
+
+           ;;rules
+           #:regexp
+           #:email
+           #:ip-address
+           ))
