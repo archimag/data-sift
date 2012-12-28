@@ -7,11 +7,11 @@
 
 (in-package #:data-sift)
 
-(define-condition invalid-rule (condition)
+(define-condition invalid-rule (error)
   ((source :initform nil :initarg :source :reader invalid-rule-source)
    (message :initform nil :initarg :message :reader validation-fail-message)))
 
-(define-condition validation-fail (condition)
+(define-condition validation-fail (error)
   ((message :initform nil :initarg :message :reader validation-fail-message))
   (:report (lambda (condition stream)
              (format stream
