@@ -7,12 +7,13 @@
 
 (defpackage #:data-sift
   (:use #:cl #:alexandria)
-  (:export #:sift
-           #:compile-rule
+  (:export #:compile-parse-rule
+           #:compile-render-rule
            
            ;; conditions
            #:invalid-rule
            #:validation-fail
+           #:validation-fail-message
            #:stop-validation
 
            ;;rules

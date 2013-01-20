@@ -7,41 +7,43 @@
 
 (in-package #:data-sift)
 
-(defgeneric compile-rule (rule &key &allow-other-keys)
-  (:documentation "Make function-validator according to RULE"))
+(defgeneric compile-parse-rule (rule &key &allow-other-keys)
+  (:documentation "Compile a validator according to RULE"))
 
-(defun sift (rule value)
-  "Validate and maybe transform VALUE according to RULE"
-  (funcall (typecase rule
-             (function rule)
-             (symbol (compile-rule rule))
-             (cons (apply #'compile-rule rule))
-             (otherwise (error 'invalid-rule
-                               :rule rule
-                               :message "Unknow as handle rule")))
-           value))
+(defgeneric compile-render-rule (rule &key &allow-other-keys)
+  (:documentation "Compile a renderer according to RULE"))
 
-(defun vfail (messsage &rest args)
-  (error 'validation-fail
-         :message 
-         (or messsage
-             (apply #'format nil args))))
+(defun default-renderer (obj)
+  (if (stringp obj)
+      obj
+      (write-to-string obj)))
+
+(defmethod compile-render-rule (rule &key &allow-other-keys)
+  #'default-renderer)
 
 ;;; list rule
 
-(defmethod compile-rule ((rule cons) &key)
-  (apply #'compile-rule rule))
+(defmethod compile-parse-rule ((rule cons) &key)
+  (apply #'compile-parse-rule rule))
+
+(defmethod compile-format-rule ((rule cons) &key)
+  (apply #'compile-format-rule rule))
 
 ;;; unknow rule
 
-(defmethod compile-rule ((symbol symbol) &rest args &key &allow-other-keys)
+(defmethod compile-parse-rule ((symbol symbol) &rest args &key &allow-other-keys)
+  (error 'invalid-rule
+         :rule (cons symbol args)
+         :message "Unknow rule"))
+
+(defmethod compile-format-rule ((symbol symbol) &rest args &key &allow-other-keys)
   (error 'invalid-rule
          :rule (cons symbol args)
          :message "Unknow rule"))
 
 ;;; functional rule
 
-(defmethod compile-rule ((rule function) &key &allow-other-keys)
+(defmethod compile-parse-rule ((rule function) &key &allow-other-keys)
   rule)
 
 ;;; string rule
@@ -49,7 +51,7 @@
 (defun strip (str)
   (string-trim #(#\Tab #\Space #\Newline #\Return #\Linefeed) str))
 
-(defmethod compile-rule ((rule (eql 'string))
+(defmethod compile-parse-rule ((rule (eql 'string))
                            &key strip (min-length 0) max-length message)
   (when min-length
     (check-type min-length integer))
@@ -75,7 +77,7 @@
 
 ;;; integer rule
 
-(defmethod compile-rule ((rule (eql 'integer)) &key min-value max-value message)
+(defmethod compile-parse-rule ((rule (eql 'integer)) &key min-value max-value message)
   (when min-value
     (check-type min-value number))
   (when max-value
@@ -102,7 +104,7 @@
 
 ;;; number rule
 
-(defmethod compile-rule ((rule (eql 'number)) &key min-value max-value message)
+(defmethod compile-parse-rule ((rule (eql 'number)) &key min-value max-value message)
   (when min-value
     (check-type min-value number))
   (when max-value
@@ -129,7 +131,7 @@
 
 ;;;; regexp rule
 
-(defmethod compile-rule ((rule (eql 'regexp))
+(defmethod compile-parse-rule ((rule (eql 'regexp))
                            &key regex message
                            case-insensitive-mode multi-line-mode single-line-mode extended-mode)
   (let ((scanner (ppcre:create-scanner regex
@@ -148,48 +150,37 @@
 (defparameter *re-email-check* 
   "^[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\\.)+[a-z0-9](?:[a-z]*[a-z])?$")
 
-(defmethod compile-rule ((rule (eql 'email)) &key message)
-  (compile-rule 'regexp 
+(defmethod compile-parse-rule ((rule (eql 'email)) &key message)
+  (compile-parse-rule 'regexp 
                 :regex *re-email-check*
-                :message (or message "Invalid email address")))
+                :message (or message "Doesn't look like a valid email.")))
 
 ;;;; ip-address rule
 
-(defmethod compile-rule ((rule (eql 'ip-address)) &key message)
-  (compile-rule 'regexp 
-                  :regex "^([0-9]{1,3}\.){3}[0-9]{1,3}$"
-                  :message (or message "Invalid email address")))
+;; (defmethod compile-parse-rule ((rule (eql 'ip-address)) &key message)
+;;   (compile-parse-rule 'regexp 
+;;                 :regex "^([0-9]{1,3}\.){3}[0-9]{1,3}$"
+;;                 :message (or message "Invalid email address")))
 
 
 ;;;; url rule
 
-;; (defmethod compile-rule ((rule (eql 'url)) &key (require-tld t) message)
+;; (defmethod compile-parse-rule ((rule (eql 'url)) &key (require-tld t) message)
 ;;   (named-lambda url-validator (value)
 ;;     (let ((url (puri:parse-uri value)))
 
 ;;;; any-of rule
 
-;;(defmethod compile-rule ((rule (eql 'any-of)) &key values message)      
+;;(defmethod compile-parse-rule ((rule (eql 'any-of)) &key values message)      
 
 ;;;; none-of rule
 
-;;(defmethod compile-rule ((rule (eql 'none-of)) &key values message)      
-
-
-
-;;;; optional rule
-
-;; (defmethod compile-rule ((rule (eql 'optional)) &key)
-;;   (named-lambda optional-validator (value)
-;;     (when (or (null value) (emptyp (strip rule)))
-;;       (error 'stop-validation))
-;;     value))
-
+;;(defmethod compile-parse-rule ((rule (eql 'none-of)) &key values message)      
 
 ;; ;;;; required rule
 
-;; (defmethod compile-rule ((rule (eql 'required)) &key message)
-;;   (named-lambda required-validator (value)
-;;     (unless (and value (not (emptyp (strip rule))))
-;;       (vfail message "Value is required."))
-;;     value))
+(defmethod compile-parse-rule ((rule (eql 'required)) &key message)
+  (named-lambda required-validator (value)
+    (when (or (null value) (emptyp (strip value)))
+      (vfail message "A value is required."))
+    value))

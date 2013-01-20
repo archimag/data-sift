@@ -21,3 +21,9 @@
 (define-condition stop-validation (condition)
   ((value :initform nil :reader stop-validation-value)
    (message :initform nil :reader stop-validation-message)))
+
+(defun vfail (messsage &rest args)
+  (error 'validation-fail
+         :message 
+         (or messsage
+             (apply #'format nil args))))
